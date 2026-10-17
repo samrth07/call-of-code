@@ -11,7 +11,7 @@ import {
 
 export const ProfilePage: React.FC = () => {
   const { user, accessToken } = useAuth();
-  const [institutions, setInstitutions] = useState<Institution[]>(FIXED_INSTITUTIONS);
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -30,13 +30,25 @@ export const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     if (!accessToken) return;
+    let isMounted = true;
+    setLoading(true);
 
-    fetchInstitutions().then(setInstitutions).catch(() => {});
+    Promise.all([
+      fetchInstitutions().catch(() => FIXED_INSTITUTIONS),
+      fetchStudentProfile(accessToken)
+    ])
+      .then(([instList, p]: [Institution[], StudentProfileData]) => {
+        if (!isMounted) return;
 
-    fetchStudentProfile(accessToken)
-      .then((p: StudentProfileData) => {
+        // Ensure student's existing institution is present in dropdown even if custom/missing
+        const list = [...instList];
+        if (p.institution && !list.some((i) => i.id === p.institution?.id)) {
+          list.unshift(p.institution);
+        }
+        setInstitutions(list);
+
         setForm({
-          name: user?.name || "",
+          name: user?.name || p.name || "",
           institutionId: p.institutionId || "",
           branch: p.branch || "",
           degree: p.degree || "",
@@ -47,8 +59,16 @@ export const ProfilePage: React.FC = () => {
           bio: p.bio || "",
         });
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        console.error("Failed to load profile data:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, [accessToken, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,7 +77,7 @@ export const ProfilePage: React.FC = () => {
     setSaving(true);
     setMessage(null);
     try {
-      await updateStudentProfile(accessToken, {
+      const updated = await updateStudentProfile(accessToken, {
         name: form.name || undefined,
         institutionId: form.institutionId || null,
         branch: form.branch || null,
@@ -68,6 +88,11 @@ export const ProfilePage: React.FC = () => {
         linkedinUrl: form.linkedinUrl || null,
         bio: form.bio || null,
       });
+
+      if (updated && updated.institutionId !== undefined) {
+        setForm((prev) => ({ ...prev, institutionId: updated.institutionId || "" }));
+      }
+
       setMessage({ type: "success", text: "Profile updated successfully!" });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Failed to update profile." });
@@ -122,7 +147,7 @@ export const ProfilePage: React.FC = () => {
               <option value="">Select your Institution</option>
               {institutions.map((i) => (
                 <option key={i.id} value={i.id}>
-                  {i.name} ({i.city})
+                  {i.name} {i.city ? `(${i.city})` : ""}
                 </option>
               ))}
             </select>

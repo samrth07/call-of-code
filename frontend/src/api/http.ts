@@ -1,4 +1,34 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:4000/api/v1";
+export const getApiBaseUrl = (): string => {
+  let envUrl = import.meta.env.VITE_API_BASE_URL;
+  if (envUrl && typeof envUrl === "string") {
+    // If user passed a comma-separated list by accident, pick the matching or first URL
+    if (envUrl.includes(",")) {
+      const urls = envUrl.split(",").map((u: string) => u.trim()).filter(Boolean);
+      const currentHost = typeof window !== "undefined" ? window.location.hostname : "";
+      envUrl = urls.find((u: string) => u.includes(currentHost)) || urls[0] || "";
+    }
+    let cleanUrl = envUrl.trim().replace(/\/+$/, "");
+    if (cleanUrl) {
+      // Ensure /api/v1 suffix is present
+      if (!cleanUrl.endsWith("/api/v1") && !cleanUrl.endsWith("/api")) {
+        cleanUrl = `${cleanUrl}/api/v1`;
+      }
+      return cleanUrl;
+    }
+  }
+
+  if (typeof window !== "undefined") {
+    // If running directly on Vite dev server on localhost, point to local backend
+    if (window.location.port === "5173" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) {
+      return "http://localhost:4000/api/v1";
+    }
+    // In production, on AWS EC2, or behind Nginx, use relative /api/v1 (same-origin, eliminates all CORS issues)
+    return "/api/v1";
+  }
+  return "/api/v1";
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 /** Fetch helper used by every API module. Throws an Error carrying the server's message (and `code`, `status`). */
 export class ApiRequestError extends Error {

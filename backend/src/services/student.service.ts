@@ -31,11 +31,9 @@ export async function getStudentProfile(userId: string) {
   });
 
   if (!profile) {
-    const defaultInst = await prisma.institution.findFirst();
     profile = await prisma.studentProfile.create({
       data: {
         userId,
-        ...(defaultInst ? { institutionId: defaultInst.id } : {}),
       },
       include: {
         institution: true,
@@ -83,11 +81,10 @@ export async function updateStudentProfile(userId: string, input: UpdateProfileI
   // Ensure profile exists
   const existing = await prisma.studentProfile.findUnique({ where: { userId } });
   if (!existing) {
-    const defaultInst = input.institutionId || (await prisma.institution.findFirst())?.id;
     await prisma.studentProfile.create({
       data: {
         userId,
-        ...(defaultInst ? { institutionId: defaultInst } : {}),
+        ...(input.institutionId ? { institutionId: input.institutionId } : {}),
       },
     });
   }

@@ -49,11 +49,9 @@ export async function saveResume(userId: string, file?: Express.Multer.File) {
   try {
     let profile = await prisma.studentProfile.findUnique({ where: { userId } });
     if (!profile) {
-      const defaultInst = await prisma.institution.findFirst();
       profile = await prisma.studentProfile.create({
         data: {
           userId,
-          ...(defaultInst ? { institutionId: defaultInst.id } : {}),
         },
       });
     }
