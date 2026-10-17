@@ -1,17 +1,18 @@
-FROM oven/bun:1.2.21-alpine
+﻿FROM oven/bun:1
 WORKDIR /var/www/kurukshetra-web
 
 COPY ./frontend/package.json ./package.json
-COPY ./frontend/bun.lock ./bun.lock
+COPY ./frontend/bun.lock* ./
+
+# Install dependencies (fetches glibc Linux native bindings for Vite & Rolldown)
+RUN bun install
+
+# Copy frontend source files
 COPY ./frontend ./
 
-# Install all workspace deps
-RUN bun install --lockfile
-
-# Build only server and its dependencies
+# Build frontend
 RUN bun run build
 
-WORKDIR /var/www/kurukshetra-web
 EXPOSE 5173
 
 CMD ["bun", "run", "preview", "--host", "0.0.0.0", "--port", "5173"]
