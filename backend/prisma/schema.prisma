@@ -17,17 +17,15 @@ model User {
   updatedAt         DateTime           @updatedAt @db.Timestamptz(6)
   passwordHash      String             @db.VarChar(255)
   applicationEvents ApplicationEvent[] @relation("ApplicationEventActor")
-  companiesCreated  Company[]          @relation("CompanyCreator")
-  recruiterProfile  RecruiterProfile?
-  parsedResumes     ParsedResume[]
-  studentProfile    StudentProfile?
   authSessions      AuthSession[]
+  companiesCreated  Company[]          @relation("CompanyCreator")
+  parsedResumes     ParsedResume[]
+  recruiterProfile  RecruiterProfile?
+  studentProfile    StudentProfile?
 
   @@index([role])
 }
 
-// Refresh-token sessions for JWT-based authentication.
-// Stores only the SHA-256 hash of the opaque refresh token.
 model AuthSession {
   id          String    @id @default(uuid()) @db.Uuid
   userId      String    @db.Uuid
@@ -37,8 +35,7 @@ model AuthSession {
   revokedAt   DateTime? @db.Timestamptz(6)
   lastUsedAt  DateTime? @db.Timestamptz(6)
   createdAt   DateTime  @default(now()) @db.Timestamptz(6)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenFamily])
@@ -73,8 +70,10 @@ model StudentProfile {
   bio            String?        @db.VarChar(1000)
   createdAt      DateTime       @default(now()) @db.Timestamptz(6)
   updatedAt      DateTime       @updatedAt @db.Timestamptz(6)
+  isAlumni       Boolean        @default(false)
   applications   Application[]
   projects       Project[]
+  referralsGiven Referral[]     @relation("ReferralAlumni")
   institution    Institution?   @relation(fields: [institutionId], references: [id])
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   skills         StudentSkill[]
@@ -109,8 +108,8 @@ model Company {
   createdAt   DateTime           @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime           @updatedAt @db.Timestamptz(6)
   createdBy   User               @relation("CompanyCreator", fields: [createdById], references: [id])
-  recruiters  RecruiterProfile[]
   jobs        JobPosting[]
+  recruiters  RecruiterProfile[]
 
   @@index([name])
 }
@@ -118,11 +117,6 @@ model Company {
 model JobPosting {
   id                  String                      @id @default(uuid()) @db.Uuid
   recruiterProfileId  String?                     @db.Uuid
-  companyId           String?                     @db.Uuid
-  origin              JobSourceType               @default(RECRUITER_POSTED)
-  dedupeKey           String?                     @db.VarChar(64)
-  sourceCount         Int                         @default(1)
-  parseMethod         String?                     @db.VarChar(16)
   title               String                      @db.VarChar(200)
   description         String
   location            String?                     @db.VarChar(200)
@@ -134,11 +128,16 @@ model JobPosting {
   status              JobStatus                   @default(DRAFT)
   createdAt           DateTime                    @default(now()) @db.Timestamptz(6)
   updatedAt           DateTime                    @updatedAt @db.Timestamptz(6)
+  companyId           String?                     @db.Uuid
+  dedupeKey           String?                     @db.VarChar(64)
+  origin              JobSourceType               @default(RECRUITER_POSTED)
+  parseMethod         String?                     @db.VarChar(16)
+  sourceCount         Int                         @default(1)
   applications        Application[]
   eligibleBranches    JobEligibleBranch[]
   graduationYears     JobEligibleGraduationYear[]
-  recruiterProfile    RecruiterProfile?           @relation(fields: [recruiterProfileId], references: [id])
   company             Company?                    @relation(fields: [companyId], references: [id])
+  recruiterProfile    RecruiterProfile?           @relation(fields: [recruiterProfileId], references: [id])
   skillRequirements   JobSkillRequirement[]
   sources             JobSource[]
 
@@ -185,9 +184,9 @@ model JobSource {
   sourceType   JobSourceType
   sourceUrl    String?       @db.VarChar(2048)
   externalId   String?       @db.VarChar(255)
-  sourceLabel  String?       @db.VarChar(120)
   fingerprint  String?       @unique @db.VarChar(255)
   importedAt   DateTime      @default(now()) @db.Timestamptz(6)
+  sourceLabel  String?       @db.VarChar(120)
   jobPosting   JobPosting    @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
 
   @@index([jobPostingId])
@@ -222,13 +221,13 @@ model StudentSkill {
   skillId            String                  @db.Uuid
   declaredLevel      ProficiencyLevel?
   verificationStatus SkillVerificationStatus @default(SELF_DECLARED)
-  assessmentScore    Int?
-  githubScore        Int?
-  combinedScore      Int?
-  evidenceStrength   String?                 @db.VarChar(16)
-  scoredAt           DateTime?               @db.Timestamptz(6)
   createdAt          DateTime                @default(now()) @db.Timestamptz(6)
   updatedAt          DateTime                @updatedAt @db.Timestamptz(6)
+  assessmentScore    Int?
+  combinedScore      Int?
+  evidenceStrength   String?                 @db.VarChar(16)
+  githubScore        Int?
+  scoredAt           DateTime?               @db.Timestamptz(6)
   evidence           SkillEvidence[]
   skill              Skill                   @relation(fields: [skillId], references: [id])
   studentProfile     StudentProfile          @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
@@ -288,16 +287,17 @@ model Application {
   id               String             @id @default(uuid()) @db.Uuid
   studentProfileId String             @db.Uuid
   jobPostingId     String             @db.Uuid
+  status           ApplicationStatus  @default(APPLIED)
   resumeUrl        String?            @db.VarChar(2048)
+  appliedAt        DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @db.Timestamptz(6)
   fitScore         Int?
   fitSnapshot      Json?
   resumeSnapshot   Json?
-  status           ApplicationStatus  @default(APPLIED)
-  appliedAt        DateTime           @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime           @updatedAt @db.Timestamptz(6)
   jobPosting       JobPosting         @relation(fields: [jobPostingId], references: [id])
   studentProfile   StudentProfile     @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   events           ApplicationEvent[]
+  referrals        Referral[]
 
   @@unique([studentProfileId, jobPostingId])
   @@index([studentProfileId, status])
@@ -318,6 +318,42 @@ model ApplicationEvent {
 
   @@index([applicationId, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+model Referral {
+  id                     String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  applicationId          String         @db.Uuid
+  alumniStudentProfileId String         @db.Uuid
+  status                 ReferralStatus @default(PENDING)
+  requestNote            String?        @db.VarChar(1000)
+  alumniNote             String?        @db.VarChar(1000)
+  requestedAt            DateTime       @default(now()) @db.Timestamptz(6)
+  respondedAt            DateTime?      @db.Timestamptz(6)
+  expiresAt              DateTime?      @db.Timestamptz(6)
+  updatedAt              DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+  alumniStudentProfile   StudentProfile @relation("ReferralAlumni", fields: [alumniStudentProfileId], references: [id])
+  application            Application    @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, alumniStudentProfileId])
+}
+
+model ParsedResume {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  schemaVersion String   @db.VarChar(20)
+  data          Json
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+enum ReferralStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+  EXPIRED
 }
 
 enum UserRole {
@@ -406,23 +442,4 @@ enum ApplicationStatus {
   HIRED
   REJECTED
   WITHDRAWN
-}
-
-
-// -----------------------------------------------------------------------------
-// Resume parsing
-// -----------------------------------------------------------------------------
-
-// Structured output of the resume parser (skills, projects, experience, links).
-// Read by the assessment generator and GitHub verifier; the raw file is not stored.
-model ParsedResume {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String   @db.Uuid
-  schemaVersion String   @db.VarChar(20)
-  data          Json
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
 }

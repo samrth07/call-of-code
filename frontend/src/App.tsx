@@ -8,6 +8,8 @@ import { ProtectedRoute } from "./components/common/ProtectedRoute";
 import { HomePage } from "./pages/HomePage";
 import { AboutPage } from "./pages/AboutPage";
 import { PublicJobsPage } from "./pages/PublicJobsPage";
+import { RoadmapPage } from "./pages/RoadmapPage";
+import { InsightsPage } from "./pages/InsightsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 
@@ -45,14 +47,17 @@ export function App() {
         <Routes>
           {/* Public Routes with Navbar and Footer */}
           <Route element={<MainLayout />}>
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
             <Route path="/" element={<HomePage />} />
             <Route path="/about" element={<AboutPage />} />
             <Route path="/jobs" element={<PublicJobsPage />} />
+            <Route path="/roadmap" element={<RoadmapPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
           </Route>
 
-          {/* Authentication Pages */}
-          <Route path="/signin" element={<SignInPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
+         
+          
 
           {/* Protected Dashboard Routes */}
           <Route
